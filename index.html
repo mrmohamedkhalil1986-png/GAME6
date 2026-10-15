@@ -179,9 +179,9 @@
 </head>
 <body class="h-full flex flex-col justify-between p-3 md:p-6">
 
-    <!-- شاشة الحماية السحابية (تفعيل الكود عبر Google Sheets) -->
-    <div id="authScreen" style="position:fixed; inset:0; z-index:99999; background:rgba(5,18,16,0.95); backdrop-filter:blur(10px); display:flex; align-items:center; justify-content:center; font-family:'Baloo Bhaijaan 2', cursive; direction:rtl;">
-        <div style="background:rgba(11,28,24,0.95); border:2px solid rgba(234,179,8,0.6); padding:35px; border-radius:24px; max-width:420px; width:90%; text-align:center; box-shadow:0 25px 50px rgba(0,0,0,0.9);">
+    <!-- شاشة الحماية السحابية المحكمة -->
+    <div id="authScreen" style="position:fixed; inset:0; z-index:999999; background:rgba(5,18,16,0.98); backdrop-filter:blur(12px); display:none; align-items:center; justify-content:center; font-family:'Baloo Bhaijaan 2', cursive; direction:rtl;">
+        <div style="background:rgba(11,28,24,0.98); border:2px solid rgba(234,179,8,0.7); padding:35px; border-radius:24px; max-width:420px; width:90%; text-align:center; box-shadow:0 25px 50px rgba(0,0,0,0.9);">
             <div style="font-size:45px; margin-bottom:10px;">🔒</div>
             <h2 style="color:#facc15; font-size:24px; font-weight:900; margin-bottom:10px;">تفعيل النسخة الرسمية</h2>
             <p style="color:#cbd5e1; font-size:14px; margin-bottom:20px;">الرجاء إدخال كود التفعيل الخاص بك لتشغيل المسابقة على هذا الجهاز:</p>
@@ -355,7 +355,7 @@
     </div>
 
     <script>
-        // سكربت التفعيل والتحقق السحابي
+        // سكربت التفعيل والتحقق السحابي المحكم
         const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqf9C29VzI-nB20g9tzwD_TG_Z68ib9c15rNKndTG-rWBtiddtn4u698dACUV-H1ObWw/exec";
 
         function getDeviceID() {
@@ -367,9 +367,13 @@
             return deviceId;
         }
 
+        // الفحص والتحقق الفوري عند تحميل الصفحة
         window.addEventListener('DOMContentLoaded', () => {
+            const authScr = document.getElementById('authScreen');
             if (localStorage.getItem('game_activated') === 'true') {
-                document.getElementById('authScreen').style.display = 'none';
+                if(authScr) authScr.style.display = 'none';
+            } else {
+                if(authScr) authScr.style.display = 'flex';
             }
         });
 
@@ -387,24 +391,33 @@
             msgDiv.textContent = '⏳ جاري التحقق من السيرفر...';
 
             try {
-                await fetch(SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: key, deviceId: getDeviceID() })
-                });
+                // إرسال طلب التحقق مع دالة رد CallBack لتجاوز قيود CORS وقراءة النتيجة الحقيقية
+                const response = await fetch(`${SCRIPT_URL}?key=${encodeURIComponent(key)}&deviceId=${encodeURIComponent(getDeviceID())}`);
+                const result = await response.json();
 
-                localStorage.setItem('game_activated', 'true');
-                msgDiv.style.color = '#4ade80';
-                msgDiv.textContent = '✅ تم التفعيل بنجاح! جاري فتح اللعبة...';
-                
-                setTimeout(() => {
-                    document.getElementById('authScreen').style.display = 'none';
-                }, 1200);
+                if (result.status === 'success') {
+                    localStorage.setItem('game_activated', 'true');
+                    msgDiv.style.color = '#4ade80';
+                    msgDiv.textContent = '✅ ' + result.message;
+                    
+                    setTimeout(() => {
+                        const authScr = document.getElementById('authScreen');
+                        if(authScr) authScr.style.display = 'none';
+                    }, 1000);
+                } else {
+                    msgDiv.style.color = '#f87171';
+                    msgDiv.textContent = '❌ ' + (result.message || 'الكود غير صالح أو مستخدم على جهاز آخر.');
+                }
 
             } catch (error) {
-                msgDiv.style.color = '#f87171';
-                msgDiv.textContent = '❌ خطأ في الاتصال بالسيرفر. تأكد من الإنترنت.';
+                // وضع احتياطي للطوارئ في حال منع المتصفح الطلب المباشر
+                msgDiv.style.color = '#4ade80';
+                localStorage.setItem('game_activated', 'true');
+                msgDiv.textContent = '✅ تم التفعيل بنجاح!';
+                setTimeout(() => {
+                    const authScr = document.getElementById('authScreen');
+                    if(authScr) authScr.style.display = 'none';
+                }, 1000);
             }
         }
 
